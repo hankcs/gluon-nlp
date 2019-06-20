@@ -125,3 +125,4 @@ conda
 
 # vscode
 .vscode
+/data

@@ -251,6 +251,15 @@ class SSTTask(GlueTask):
         """
         return GlueSST2(segment=segment, root=root)
 
+class RadiologyTask(GlueTask):
+
+    def __init__(self, class_labels, metrics, is_pair, label_alias=None):
+        is_pair = False
+        class_labels = ['71010', '71020', '71035', '71022', '71030', '71021']
+        metric = Accuracy()
+        super(SSTTask, self).__init__(class_labels, metric, is_pair)
+
+
 class WNLITask(GlueTask):
     """The Winograd NLI task on GlueBenchmark."""
     def __init__(self):

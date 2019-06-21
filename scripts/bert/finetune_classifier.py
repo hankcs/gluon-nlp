@@ -305,10 +305,11 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, pad=Fa
         nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(),
         nlp.data.batchify.Pad(axis=0))
     # transform for data test
-    test_trans = BERTDatasetTransform(tokenizer, max_len,
-                                      class_labels=None,
-                                      pad=pad, pair=task.is_pair,
-                                      has_label=False)
+    # test_trans = BERTDatasetTransform(tokenizer, max_len,
+    #                                   class_labels=None,
+    #                                   pad=pad, pair=task.is_pair,
+    #                                   has_label=True)
+    test_trans = trans
 
     # data test. For MNLI, more than one test set is available
     test_tsv = task.dataset_test()
@@ -471,12 +472,11 @@ def train(metric):
                     step_loss = 0
             mx.nd.waitall()
 
-        # inference on dev data
-        for segment, dev_data in dev_data_list:
-            metric_nm, metric_val = evaluate(dev_data, metric, segment)
-            metric_history.append((epoch_id, metric_nm, metric_val))
-
         if not only_inference:
+            # inference on dev data
+            for segment, dev_data in dev_data_list:
+                metric_nm, metric_val = evaluate(dev_data, metric, segment)
+                metric_history.append((epoch_id, metric_nm, metric_val))
             # save params
             ckpt_name = 'model_bert_{0}_{1}.params'.format(task_name, epoch_id)
             params_saved = os.path.join(output_dir, ckpt_name)
@@ -502,6 +502,10 @@ def train(metric):
     # inference on test data
     for segment, test_data in test_data_list:
         test(test_data, segment)
+        metric_nm, metric_val = evaluate(test_data, metric, segment)
+        metric_str = 'Test validation metrics:'
+        metric_str += ','.join([i + ':%.4f' for i in metric_nm])
+        logging.info(metric_str, *metric_val)
 
 def evaluate(loader_dev, metric, segment):
     """Evaluate the model on validation dataset."""

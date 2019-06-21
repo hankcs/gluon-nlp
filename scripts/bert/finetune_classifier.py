@@ -50,7 +50,7 @@ from gluonnlp.model import get_model
 from gluonnlp.data import BERTTokenizer
 
 from model.classification import BERTClassifier, BERTRegression
-from data.classification import MRPCTask, QQPTask, RTETask, STSBTask, SSTTask
+from data.classification import MRPCTask, QQPTask, RTETask, STSBTask, SSTTask, RadiologyTask
 from data.classification import QNLITask, CoLATask, MNLITask, WNLITask, XNLITask
 from data.transform import BERTDatasetTransform
 
@@ -64,7 +64,8 @@ tasks = {
     'MNLI': MNLITask(),
     'WNLI': WNLITask(),
     'SST': SSTTask(),
-    'XNLI': XNLITask()
+    'XNLI': XNLITask(),
+    'RAD': RadiologyTask()
 }
 
 parser = argparse.ArgumentParser(
@@ -125,7 +126,7 @@ parser.add_argument(
     help='The number of batches for gradients accumulation to simulate large batch size. '
          'Default is None')
 parser.add_argument(
-    '--gpu', type=int, default=None, help='Which gpu for finetuning. By default cpu is used.')
+    '--gpu', type=int, default=0, help='Which gpu for finetuning. By default cpu is used.')
 parser.add_argument(
     '--task_name',
     type=str,

@@ -24,7 +24,7 @@ __all__ = [
 import os
 from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMetric
 from gluonnlp.base import get_home_dir
-from gluonnlp.data import GlueCoLA, GlueSST2, GlueSTSB, GlueMRPC
+from gluonnlp.data import GlueCoLA, GlueSST2, GlueSTSB, GlueMRPC, TSVDataset
 from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
 try:
     from .baidu_ernie_data import BaiduErnieXNLI
@@ -253,12 +253,14 @@ class SSTTask(GlueTask):
 
 class RadiologyTask(GlueTask):
 
-    def __init__(self, class_labels, metrics, is_pair, label_alias=None):
+    def __init__(self):
         is_pair = False
         class_labels = ['71010', '71020', '71035', '71022', '71030', '71021']
         metric = Accuracy()
-        super(SSTTask, self).__init__(class_labels, metric, is_pair)
+        super(RadiologyTask, self).__init__(class_labels, metric, is_pair)
 
+    def get_dataset(self, segment='train', root='data'):
+        return TSVDataset(filename=os.path.join(root, '{}.tsv'.format(segment)))
 
 class WNLITask(GlueTask):
     """The Winograd NLI task on GlueBenchmark."""

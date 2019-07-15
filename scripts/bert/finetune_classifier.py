@@ -316,13 +316,13 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, pad=Fa
     test_tsv_list = test_tsv if isinstance(test_tsv, list) else [test_tsv]
     loader_test_list = []
     for segment, data in test_tsv_list:
-        data_test = mx.gluon.data.SimpleDataset(pool.map(test_trans, data))
+        data_test = mx.gluon.data.SimpleDataset(pool.map(trans, data))
         loader_test = mx.gluon.data.DataLoader(
             data_test,
             batch_size=dev_batch_size,
             num_workers=1,
             shuffle=False,
-            batchify_fn=test_batchify_fn)
+            batchify_fn=batchify_fn)
         loader_test_list.append((segment, loader_test))
     return loader_train, loader_dev_list, loader_test_list, len(data_train)
 
@@ -501,7 +501,7 @@ def train(metric):
 
     # inference on test data
     for segment, test_data in test_data_list:
-        test(test_data, segment)
+        # test(test_data, segment)
         metric_nm, metric_val = evaluate(test_data, metric, segment)
         metric_str = 'Test validation metrics:'
         metric_str += ','.join([i + ':%.4f' for i in metric_nm])

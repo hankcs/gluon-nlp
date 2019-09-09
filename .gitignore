@@ -132,3 +132,4 @@ conda
 # license checker
 ci/rat/apache-rat/
 ci/rat/apache-rat.jar
+data

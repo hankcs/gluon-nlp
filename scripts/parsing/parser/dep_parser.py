@@ -301,12 +301,20 @@ class DepParser:
 if __name__ == '__main__':
     save_dir = 'data/model/biaffine'
     dep_parser = DepParser()
-    dep_parser.train(train_file='data/ptb/train.conllx',
-                     dev_file='data//ptb/dev.conllx',
-                     test_file='data//ptb/test.conllx',
+    dep_parser.train(train_file='data/ptb/train-debug.conllx',
+                     dev_file='data//ptb/dev-debug.conllx',
+                     test_file='data//ptb/test-debug.conllx',
                      bert='data/bert/bert_base_original',
+                     num_buckets_train=2,
+                     num_buckets_valid=2,
                      save_dir=save_dir,
                      pretrained_embeddings=('glove', 'glove.6B.100d'))
+    # dep_parser.train(train_file='data/ptb/train.conllx',
+    #                  dev_file='data//ptb/dev.conllx',
+    #                  test_file='data//ptb/test.conllx',
+    #                  bert='data/bert/bert_base_original',
+    #                  save_dir=save_dir,
+    #                  pretrained_embeddings=('glove', 'glove.6B.100d'))
     dep_parser.load(save_dir)
     dep_parser.evaluate(test_file='data/biaffine/ptb/test.conllx',
                         save_dir=save_dir)

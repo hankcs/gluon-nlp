@@ -24,15 +24,14 @@ import os
 import sys
 import time
 
-import numpy as np
 import mxnet as mx
-from gluonnlp.vocab import BERTVocab
+import numpy as np
 from mxnet import nd
 from mxnet.gluon import rnn, contrib
 
+import gluonnlp
 from common.data import ParserVocabulary
 from common.tarjan import Tarjan
-from gluonnlp.data.utils import _load_pretrained_vocab
 from gluonnlp.model.bert import get_bert_model
 
 
@@ -537,32 +536,11 @@ def load_bert(path):
     return bert, vocab
 
 
-def bert_tokenize_sentence(sentence, bert_tokenizer):
-    """Apply BERT tokenizer on a tagged sentence to break words into sub-words.
-    This function assumes input tags are following IOBES, and outputs IOBES tags.
-
-    Parameters
-    ----------
-    sentence: List[str]
-        List of tagged words
-    bert_tokenizer: nlp.data.BertTokenizer
-        BERT tokenizer
-
-    Returns
-    -------
-    List[TaggedToken]: list of annotated sub-word tokens
-    """
-    ret = []
-    for token in sentence:
-        # break a word into sub-word tokens
-        sub_token_texts = bert_tokenizer(token.text)
-        # only the first token of a word is going to be tagged
-        ret.append(TaggedToken(text=sub_token_texts[0], tag=token.tag))
-        ret += [TaggedToken(text=sub_token_text, tag=NULL_TAG)
-                for sub_token_text in sub_token_texts[1:]]
-
-    return ret
-
-
-if __name__ == '__main__':
-    load_bert('data/bert/bert_base_original')
+# def main():
+#     bert, vocab = load_bert('data/bert/bert_base_original')
+#     tokenizer = create_bert_tokenizer(vocab)
+#     print(bert_tokenize_sentence('doghouse is good'.split(), tokenizer))
+#
+#
+# if __name__ == '__main__':
+#     main()

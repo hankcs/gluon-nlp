@@ -20,11 +20,41 @@
 
 from collections import Counter
 import numpy as np
+from gluonnlp.vocab import BERTVocab
 
 import gluonnlp
+from common.savable import Savable
+from gluonnlp.model.utils import _load_vocab
 from scripts.parsing.common.k_means import KMeans
+import itertools
 
-from .savable import Savable
+
+def create_bert_tokenizer(bert_vocab):
+    return gluonnlp.data.BERTTokenizer(vocab=bert_vocab, lower=True)
+
+
+def bert_tokenize_sentence(sentence, bert_tokenizer):
+    """Apply BERT tokenizer on a tagged sentence to break words into sub-words.
+    This function assumes input tags are following IOBES, and outputs IOBES tags.
+
+    Parameters
+    ----------
+    sentence: List[str]
+        List of tagged words
+    bert_tokenizer: nlp.data.BertTokenizer
+        BERT tokenizer
+
+    Returns
+    -------
+    List[List[str]]: list of annotated sub-word tokens
+    """
+    ret = []
+    for token in sentence:
+        # break a word into sub-word tokens
+        sub_token_texts = bert_tokenizer(token)
+        ret.append(sub_token_texts)
+
+    return ret
 
 
 class ConllWord:
@@ -57,6 +87,7 @@ class ConllWord:
     pdeprel : str
         Dependency relation to the PHEAD, or an underscore if not available.
     """
+
     def __init__(self, idx, form, lemma=None, cpos=None, pos=None, feats=None,
                  head=None, relation=None, phead=None, pdeprel=None):
         self.idx = idx
@@ -84,6 +115,7 @@ class ConllSentence:
     words : ConllWord
         words of a sentence
     """
+
     def __init__(self, words):
         super().__init__()
         self.words = words
@@ -116,6 +148,7 @@ class ParserVocabulary(Savable):
     min_occur_count : int
         threshold of word frequency, those words with smaller frequency will be replaced by UNK
     """
+
     def __init__(self, input_file, pret_embeddings=None, min_occur_count=2):
         super().__init__()
         word_counter = Counter()
@@ -159,7 +192,7 @@ class ParserVocabulary(Savable):
         self._tag2id = reverse(self._id2tag)
         self._rel2id = reverse(self._id2rel)
 
-    PAD, ROOT, UNK = 0, 1, 2 # Padding, Root, Unknown
+    PAD, ROOT, UNK = 0, 1, 2  # Padding, Root, Unknown
 
     def log_info(self, logger):
         """Print statistical information via the provided logger
@@ -365,6 +398,25 @@ class ParserVocabulary(Savable):
         return len(self._id2rel)
 
 
+def combine_words(words, tokenizer):
+    offsets = [-1] * len(words)
+    sent = []
+    for i, token in enumerate(words):
+        token = tokenizer(token)
+        offsets[i] = (len(sent), len(sent) + len(token))
+        sent += token
+    return sent, offsets
+
+
+def combine_list_of_words(words_list, tokenizer):
+    strings, offsets = [], []
+    for words in words_list:
+        sent, offset = combine_words(words, tokenizer)
+        strings.append(sent)
+        offsets.append(offset)
+    return strings, offsets
+
+
 class DataLoader:
     """
     Load CoNLL data
@@ -380,8 +432,9 @@ class DataLoader:
         vocabulary object
     """
 
-    def __init__(self, input_file, n_bkts, vocab):
+    def __init__(self, input_file, n_bkts, vocab, bert_vocab=None):
         self.vocab = vocab
+        self.bert_vocab = bert_vocab
         sents = []
         sent = [[ParserVocabulary.ROOT, ParserVocabulary.ROOT, 0, ParserVocabulary.ROOT]]
         with open(input_file) as f:
@@ -410,6 +463,7 @@ class DataLoader:
             len_counter[len(sent)] += 1
         self._bucket_lengths = KMeans(n_bkts, len_counter).splits
         self._buckets = [[] for i in range(n_bkts)]
+
         # bkt_idx x length x sent_idx x 4
         len2bkt = {}
         prev_length = -1
@@ -425,10 +479,55 @@ class DataLoader:
             self._buckets[bkt_idx].append(sent)
             self._record.append((bkt_idx, idx))
 
+        if bert_vocab:
+            self._buckets_sub_token_seq = [[] for i in range(n_bkts)]
+            self._buckets_sub_token_offset = [[] for i in range(n_bkts)]
+            tokenizer = create_bert_tokenizer(bert_vocab)
+            cls_id = bert_vocab[bert_vocab.cls_token]
+            sep_id = bert_vocab[bert_vocab.sep_token]
+            pad_id = bert_vocab[bert_vocab.padding_token]
+
         for bkt_idx, (bucket, length) in enumerate(zip(self._buckets, self._bucket_lengths)):
             self._buckets[bkt_idx] = np.zeros((length, len(bucket), 4), dtype=np.int32)
             for idx, sent in enumerate(bucket):
                 self._buckets[bkt_idx][:len(sent), idx, :] = np.array(sent, dtype=np.int32)
+
+            if bert_vocab:
+                sent_list = []
+                for idx, sent in enumerate(bucket):
+                    word_list = []
+                    for tp in sent:
+                        word = vocab.id2word(tp[0])
+                        word_list.append(word)
+                    sent_list.append(word_list)
+
+                sub_words, offsets = combine_list_of_words(sent_list, tokenizer)
+                max_sent_len = len(max(sub_words, key=len))
+                max_word_len = max(map(lambda se: se[1] - se[0], itertools.chain(*offsets)))
+                pad_sub_word_id = gluonnlp.data.PadSequence(max_sent_len + 2, pad_val=pad_id, clip=True)
+                sub_word_id_list = []
+                valid_length_list = []
+                for sent in sub_words:
+                    ids = [cls_id] + bert_vocab[sent] + [sep_id]
+                    valid_length_list.append(len(ids))
+                    ids = pad_sub_word_id(ids)
+                    sub_word_id_list.append(ids)
+
+                char_offset_pad = 0
+                pad_offsets = gluonnlp.data.PadSequence(max_word_len, pad_val=char_offset_pad, clip=True)
+                pad_offsets_over_sent = gluonnlp.data.PadSequence(length, pad_val=[0] * max_word_len,
+                                                                  clip=True)
+                offset_for_sent = []
+                for offset_sent in offsets:
+                    offset_for_word = []
+                    for start, end in offset_sent:
+                        padded_offset = pad_offsets(list(range(start + 1, end + 1)))  # +1 for cls
+                        offset_for_word.append(padded_offset)
+                    offset_for_word = pad_offsets_over_sent(offset_for_word)
+                    offset_for_sent.append(offset_for_word)
+
+                self._buckets_sub_token_offset[bkt_idx] = np.array(offset_for_sent)
+                self._buckets_sub_token_seq[bkt_idx] = np.array(sub_word_id_list)
 
     @property
     def idx_sequence(self):
@@ -473,4 +572,24 @@ class DataLoader:
             tag_inputs = self._buckets[bkt_idx][:, bkt_batch, 1]
             arc_targets = self._buckets[bkt_idx][:, bkt_batch, 2]
             rel_targets = self._buckets[bkt_idx][:, bkt_batch, 3]
-            yield word_inputs, tag_inputs, arc_targets, rel_targets
+            if self.bert_vocab:
+                yield word_inputs, tag_inputs, arc_targets, rel_targets, self._buckets_sub_token_seq[bkt_idx][
+                    bkt_batch], self._buckets_sub_token_offset[bkt_idx][bkt_batch]
+            else:
+                yield word_inputs, tag_inputs, arc_targets, rel_targets
+
+
+def main():
+    train_file = 'data/ptb/train-debug.conllx'
+    vocab = ParserVocabulary(train_file,
+                             None,
+                             min_occur_count=0)
+    bert_vocab = _load_vocab('book_corpus_wiki_en_uncased', None, 'data', cls=BERTVocab)
+    data_loader = DataLoader(train_file, 4, vocab, bert_vocab=bert_vocab)
+
+    for word_inputs, tag_inputs, arc_targets, rel_targets, sub_word_seq, sub_word_offset in data_loader.get_batches(5):
+        print()
+
+
+if __name__ == '__main__':
+    main()

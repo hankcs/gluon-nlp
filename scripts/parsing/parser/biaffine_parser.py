@@ -174,7 +174,8 @@ class BiaffineParser(nn.Block):
         p = self.params.get(name, shape=shape, init=init)
         return p
 
-    def forward(self, word_inputs, tag_inputs, arc_targets=None, rel_targets=None, sub_words=None, offsets=None):
+    def forward(self, word_inputs, tag_inputs, arc_targets=None, rel_targets=None, sub_words=None, offsets=None,
+                token_types=None, valid_lengths=None):
         # pylint: disable=arguments-differ
         """Run decoding
 
@@ -233,7 +234,8 @@ class BiaffineParser(nn.Block):
         # Dropout
         emb_inputs = nd.concat(word_embs, tag_embs, dim=2)  # seq_len x batch_size
         if self.bert is not None:
-            bert_embed: nd.NDArray = self.bert(sub_words, token_types, valid_length.squeeze())
+            bert_embed: nd.NDArray = self.bert(sub_words, token_types, valid_lengths)
+            bert_embed
 
         top_recur = utils.biLSTM(self.f_lstm, self.b_lstm, emb_inputs,
                                  dropout_x=self.dropout_lstm_input)

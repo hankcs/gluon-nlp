@@ -531,8 +531,8 @@ def reshape_fortran(tensor, shape):
     return tensor.T.reshape(tuple(reversed(shape))).T
 
 
-def load_bert(path):
-    bert, vocab = get_bert_model(model_name='bert_12_768_12', root=path, dataset_name='book_corpus_wiki_en_uncased')
+def load_bert(path, ctx=None):
+    bert, vocab = get_bert_model(model_name='bert_12_768_12', root=path, dataset_name='book_corpus_wiki_en_uncased', ctx=ctx)
     return bert, vocab
 
 

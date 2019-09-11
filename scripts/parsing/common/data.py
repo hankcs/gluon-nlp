@@ -27,6 +27,7 @@ from common.savable import Savable
 from gluonnlp.model.utils import _load_vocab
 from scripts.parsing.common.k_means import KMeans
 import itertools
+import mxnet.ndarray as nd
 
 
 def create_bert_tokenizer(bert_vocab):
@@ -573,8 +574,13 @@ class DataLoader:
             arc_targets = self._buckets[bkt_idx][:, bkt_batch, 2]
             rel_targets = self._buckets[bkt_idx][:, bkt_batch, 3]
             if self.bert_vocab:
-                yield word_inputs, tag_inputs, arc_targets, rel_targets, self._buckets_sub_token_seq[bkt_idx][
-                    bkt_batch], self._buckets_sub_token_offset[bkt_idx][bkt_batch]
+                sub_words = self._buckets_sub_token_seq[bkt_idx][bkt_batch]
+                offsets = self._buckets_sub_token_offset[bkt_idx][bkt_batch]
+                token_types = np.zeros_like(sub_words)
+                valid_lengths = np.not_equal(sub_words, 1).sum(axis=1)
+                sub_words, token_types, valid_lengths = nd.array(sub_words), nd.array(token_types), nd.array(
+                    valid_lengths)
+                yield word_inputs, tag_inputs, arc_targets, rel_targets, sub_words, offsets, token_types, valid_lengths
             else:
                 yield word_inputs, tag_inputs, arc_targets, rel_targets
 
@@ -587,7 +593,8 @@ def main():
     bert_vocab = _load_vocab('book_corpus_wiki_en_uncased', None, 'data', cls=BERTVocab)
     data_loader = DataLoader(train_file, 4, vocab, bert_vocab=bert_vocab)
 
-    for word_inputs, tag_inputs, arc_targets, rel_targets, sub_word_seq, sub_word_offset in data_loader.get_batches(5):
+    for word_inputs, tag_inputs, arc_targets, rel_targets, sub_word_seq, sub_word_offset, token_types, valid_lengths in data_loader.get_batches(
+            5):
         print()
 
 

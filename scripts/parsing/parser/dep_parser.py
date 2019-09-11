@@ -141,10 +141,11 @@ class DepParser:
                                                min_occur_count)
         vocab.save(config.save_vocab_path)
         vocab.log_info(logger)
-        if bert:
-            bert, bert_vocab = load_bert('data/bert/bert_base_original')
 
-        with mx.Context(mxnet_prefer_gpu()):
+        ctx = mxnet_prefer_gpu()
+        with mx.Context(ctx):
+            if bert:
+                bert, bert_vocab = load_bert('data/bert/bert_base_original', ctx=ctx)
             self._parser = parser = BiaffineParser(vocab, word_dims, tag_dims, bert,
                                                    dropout_emb,
                                                    lstm_layers,
@@ -157,7 +158,7 @@ class DepParser:
             optimizer = mx.optimizer.Adam(learning_rate, beta_1, beta_2, epsilon,
                                           lr_scheduler=scheduler)
             trainer = gluon.Trainer(parser.collect_params(), optimizer=optimizer)
-            data_loader = DataLoader(train_file, num_buckets_train, vocab)
+            data_loader = DataLoader(train_file, num_buckets_train, vocab, bert_vocab=bert_vocab)
             global_step = 0
             best_UAS = 0.
             batch_id = 0
@@ -309,7 +310,7 @@ if __name__ == '__main__':
                      num_buckets_train=2,
                      num_buckets_valid=2,
                      save_dir=save_dir,
-                     pretrained_embeddings=('glove', 'glove.6B.100d'))
+                     pretrained_embeddings=None, debug=True)
     # dep_parser.train(train_file='data/ptb/train.conllx',
     #                  dev_file='data//ptb/dev.conllx',
     #                  test_file='data//ptb/test.conllx',

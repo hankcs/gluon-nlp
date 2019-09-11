@@ -41,9 +41,11 @@ class BiaffineParser(nn.Block):
         built from a data set
     word_dims : int
         word vector dimension
+    bert : str
+        path to bert model
     tag_dims : int
         tag vector dimension
-    dropout_dim : int
+    dropout_dim : float
         keep rate of word dropout (drop out entire embedding)
     lstm_layers : int
         number of lstm layers
@@ -65,6 +67,7 @@ class BiaffineParser(nn.Block):
     def __init__(self, vocab,
                  word_dims,
                  tag_dims,
+                 bert,
                  dropout_dim,
                  lstm_layers,
                  lstm_hiddens,
@@ -90,7 +93,7 @@ class BiaffineParser(nn.Block):
                                                    trainable=False) if vocab.has_pret_embs() \
                               else None
         self.tag_embs = embedding_from_numpy(vocab.get_tag_embs(tag_dims))
-
+        self.bert = bert
         self.f_lstm = nn.Sequential()
         self.b_lstm = nn.Sequential()
         self.f_lstm.add(utils.orthonormal_VanillaLSTMBuilder(1, word_dims + tag_dims,

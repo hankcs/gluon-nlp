@@ -26,7 +26,7 @@ from scripts.parsing.common.savable import Savable
 
 class _Config(Savable):
     def __init__(self, train_file, dev_file, test_file, save_dir,
-                 pretrained_embeddings_file=None, min_occur_count=2,
+                 pretrained_embeddings_file=None, bert=None, min_occur_count=2,
                  lstm_layers=3, word_dims=100, tag_dims=100, dropout_emb=0.33, lstm_hiddens=400,
                  dropout_lstm_input=0.33,
                  dropout_lstm_hidden=0.33, mlp_arc_size=500, mlp_rel_size=100,
@@ -73,6 +73,7 @@ class _Config(Savable):
         """
         super(_Config, self).__init__()
         self.pretrained_embeddings_file = pretrained_embeddings_file
+        self.bert = bert
         self.train_file = train_file
         self.dev_file = dev_file
         self.test_file = test_file

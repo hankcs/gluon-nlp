@@ -28,7 +28,7 @@ from mxnet import gluon, autograd
 from scripts.parsing.common.config import _Config
 from scripts.parsing.common.data import ParserVocabulary, DataLoader, ConllWord, ConllSentence
 from scripts.parsing.common.exponential_scheduler import ExponentialScheduler
-from scripts.parsing.common.utils import init_logger, mxnet_prefer_gpu, Progbar
+from scripts.parsing.common.utils import init_logger, mxnet_prefer_gpu, Progbar, load_bert
 from scripts.parsing.parser.biaffine_parser import BiaffineParser
 from scripts.parsing.parser.evaluate import evaluate_official_script
 
@@ -45,7 +45,7 @@ class DepParser:
         self._vocab = None
 
     def train(self, train_file, dev_file, test_file, save_dir,
-              pretrained_embeddings=None, min_occur_count=2,
+              pretrained_embeddings=None, bert=None, min_occur_count=2,
               lstm_layers=3, word_dims=100, tag_dims=100, dropout_emb=0.33, lstm_hiddens=400,
               dropout_lstm_input=0.33, dropout_lstm_hidden=0.33,
               mlp_arc_size=500, mlp_rel_size=100,
@@ -141,9 +141,11 @@ class DepParser:
                                                min_occur_count)
         vocab.save(config.save_vocab_path)
         vocab.log_info(logger)
+        if bert:
+            bert, bert_vocab = load_bert('data/bert/bert_base_original')
 
         with mx.Context(mxnet_prefer_gpu()):
-            self._parser = parser = BiaffineParser(vocab, word_dims, tag_dims,
+            self._parser = parser = BiaffineParser(vocab, word_dims, tag_dims, bert,
                                                    dropout_emb,
                                                    lstm_layers,
                                                    lstm_hiddens, dropout_lstm_input,
@@ -297,15 +299,17 @@ class DepParser:
 
 
 if __name__ == '__main__':
+    save_dir = 'data/model/biaffine'
     dep_parser = DepParser()
-    dep_parser.train(train_file='tests/data/biaffine/ptb/train.conllx',
-                     dev_file='tests/data/biaffine/ptb/dev.conllx',
-                     test_file='tests/data/biaffine/ptb/test.conllx',
-                     save_dir='tests/data/biaffine/model',
+    dep_parser.train(train_file='data/ptb/train.conllx',
+                     dev_file='data//ptb/dev.conllx',
+                     test_file='data//ptb/test.conllx',
+                     bert='data/bert/bert_base_original',
+                     save_dir=save_dir,
                      pretrained_embeddings=('glove', 'glove.6B.100d'))
-    dep_parser.load('tests/data/biaffine/model')
-    dep_parser.evaluate(test_file='tests/data/biaffine/ptb/test.conllx',
-                        save_dir='tests/data/biaffine/model')
+    dep_parser.load(save_dir)
+    dep_parser.evaluate(test_file='data/biaffine/ptb/test.conllx',
+                        save_dir=save_dir)
 
     sent = [('Is', 'VBZ'), ('this', 'DT'), ('the', 'DT'), ('future', 'NN'),
             ('of', 'IN'), ('chamber', 'NN'), ('music', 'NN'), ('?', '.')]

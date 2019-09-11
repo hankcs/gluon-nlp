@@ -26,11 +26,14 @@ import time
 
 import numpy as np
 import mxnet as mx
+from gluonnlp.vocab import BERTVocab
 from mxnet import nd
 from mxnet.gluon import rnn, contrib
 
-from .data import ParserVocabulary
-from .tarjan import Tarjan
+from common.data import ParserVocabulary
+from common.tarjan import Tarjan
+from gluonnlp.data.utils import _load_pretrained_vocab
+from gluonnlp.model.bert import get_bert_model
 
 
 class Progbar:
@@ -48,6 +51,7 @@ class Progbar:
     verbose : int
         Verbosity level. Options are 1 and 2.
     """
+
     def __init__(self, target, width=30, verbose=1):
         self.width = width
         self.target = target
@@ -105,7 +109,7 @@ class Progbar:
             sys.stdout.write('\r')
 
             numdigits = 0 if self.target == 0 or math.isnan(self.target) \
-                        else int(np.floor(np.log10(self.target))) + 1
+                else int(np.floor(np.log10(self.target))) + 1
             barstr = '%%%dd/%%%dd [' % (numdigits, numdigits)
             bar = barstr % (current, self.target)
             prog = 0 if self.target == 0 else float(current) / self.target
@@ -364,8 +368,8 @@ def orthonormal_initializer(output_size, input_size, debug=False):
             loss = np.sum(QTQmI ** 2 / 2)
             Q2 = Q ** 2
             Q -= lr * Q.dot(QTQmI) / (
-                np.abs(Q2 + Q2.sum(axis=0, keepdims=True)
-                       + Q2.sum(axis=1, keepdims=True) - 1) + eps)
+                    np.abs(Q2 + Q2.sum(axis=0, keepdims=True)
+                           + Q2.sum(axis=1, keepdims=True) - 1) + eps)
             if np.max(Q) > 1e6 or loss > 1e6 or not np.isfinite(loss):
                 tries += 1
                 lr /= 2
@@ -526,3 +530,12 @@ def reshape_fortran(tensor, shape):
         reordered result
     """
     return tensor.T.reshape(tuple(reversed(shape))).T
+
+
+def load_bert(path):
+    bert, vocab = get_bert_model(model_name='bert_12_768_12', root=path, dataset_name='book_corpus_wiki_en_uncased')
+    return bert, vocab
+
+
+if __name__ == '__main__':
+    load_bert('data/bert/bert_base_original')

@@ -166,10 +166,11 @@ class DepParser:
             logger.info('Epoch %d out of %d', epoch, total_epoch)
             bar = Progbar(target=min(validate_every, data_loader.samples))
             while global_step < train_iters:
-                for words, tags, arcs, rels in data_loader.get_batches(batch_size=train_batch_size,
-                                                                       shuffle=True):
+                for batch in data_loader.get_batches(batch_size=train_batch_size,
+                                                     shuffle=True):
+
                     with autograd.record():
-                        arc_accuracy, _, _, loss = parser.forward(words, tags, arcs, rels)
+                        arc_accuracy, _, _, loss = parser.forward(*batch)
                         loss_value = loss.asscalar()
                     loss.backward()
                     trainer.step(train_batch_size)

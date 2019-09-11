@@ -24,7 +24,7 @@ from mxnet import nd, ndarray, autograd
 from mxnet.gluon import nn, loss
 
 from scripts.parsing.common import utils
-from gluonnlp.model import apply_weight_drop
+from gluonnlp.model import apply_weight_drop, BERTModel
 
 
 class BiaffineParser(nn.Block):
@@ -41,8 +41,8 @@ class BiaffineParser(nn.Block):
         built from a data set
     word_dims : int
         word vector dimension
-    bert : str
-        path to bert model
+    bert : BERTModel
+         bert model
     tag_dims : int
         tag vector dimension
     dropout_dim : float
@@ -64,10 +64,11 @@ class BiaffineParser(nn.Block):
     debug : bool
         debug mode
     """
+
     def __init__(self, vocab,
                  word_dims,
                  tag_dims,
-                 bert,
+                 bert: BERTModel,
                  dropout_dim,
                  lstm_layers,
                  lstm_hiddens,
@@ -88,19 +89,20 @@ class BiaffineParser(nn.Block):
             return word_embs
 
         self._vocab = vocab
+        self.bert = bert
         self.word_embs = embedding_from_numpy(vocab.get_word_embs(word_dims))
         self.pret_word_embs = embedding_from_numpy(vocab.get_pret_embs(),
                                                    trainable=False) if vocab.has_pret_embs() \
-                              else None
+            else None
         self.tag_embs = embedding_from_numpy(vocab.get_tag_embs(tag_dims))
-        self.bert = bert
         self.f_lstm = nn.Sequential()
         self.b_lstm = nn.Sequential()
-        self.f_lstm.add(utils.orthonormal_VanillaLSTMBuilder(1, word_dims + tag_dims,
+        bert_dim = 0 if bert is None else 768
+        self.f_lstm.add(utils.orthonormal_VanillaLSTMBuilder(1, word_dims + tag_dims + bert_dim,
                                                              lstm_hiddens,
                                                              dropout_lstm_hidden, debug))
         self.b_lstm.add(
-            utils.orthonormal_VanillaLSTMBuilder(1, word_dims + tag_dims,
+            utils.orthonormal_VanillaLSTMBuilder(1, word_dims + tag_dims + bert_dim,
                                                  lstm_hiddens,
                                                  dropout_lstm_hidden, debug))
         for _ in range(lstm_layers - 1):
@@ -172,7 +174,7 @@ class BiaffineParser(nn.Block):
         p = self.params.get(name, shape=shape, init=init)
         return p
 
-    def forward(self, word_inputs, tag_inputs, arc_targets=None, rel_targets=None):
+    def forward(self, word_inputs, tag_inputs, arc_targets=None, rel_targets=None, sub_words=None, offsets=None):
         # pylint: disable=arguments-differ
         """Run decoding
 
@@ -194,6 +196,7 @@ class BiaffineParser(nn.Block):
             then return arc_accuracy, rel_accuracy, overall_accuracy, outputs,
             otherwise return outputs, where outputs is a list of (arcs, rels).
         """
+
         def flatten_numpy(arr):
             """Flatten nd-array to 1-d column vector
 
@@ -229,6 +232,8 @@ class BiaffineParser(nn.Block):
 
         # Dropout
         emb_inputs = nd.concat(word_embs, tag_embs, dim=2)  # seq_len x batch_size
+        if self.bert is not None:
+            bert_embed: nd.NDArray = self.bert(sub_words, token_types, valid_length.squeeze())
 
         top_recur = utils.biLSTM(self.f_lstm, self.b_lstm, emb_inputs,
                                  dropout_x=self.dropout_lstm_input)
@@ -279,7 +284,7 @@ class BiaffineParser(nn.Block):
                                                              seq_len * batch_size))
         # (#head x rel_size) x (#dep x batch_size)
 
-        if is_train: # pylint: disable=using-constant-test
+        if is_train:  # pylint: disable=using-constant-test
             _target_vec = targets_1D
         else:
             _target_vec = flatten_numpy(arc_preds.asnumpy())
@@ -309,7 +314,7 @@ class BiaffineParser(nn.Block):
             correct = rel_correct * flatten_numpy(arc_correct)
             overall_accuracy = np.sum(correct) / num_tokens
 
-        if is_train: # pylint: disable=using-constant-test
+        if is_train:  # pylint: disable=using-constant-test
             return arc_accuracy, rel_accuracy, overall_accuracy, l
 
         outputs = []

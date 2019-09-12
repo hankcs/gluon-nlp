@@ -578,8 +578,8 @@ class DataLoader:
                 offsets = self._buckets_sub_token_offset[bkt_idx][bkt_batch]
                 token_types = np.zeros_like(sub_words)
                 valid_lengths = np.not_equal(sub_words, 1).sum(axis=1)
-                sub_words, token_types, valid_lengths = nd.array(sub_words), nd.array(token_types), nd.array(
-                    valid_lengths)
+                sub_words, offsets, token_types, valid_lengths = nd.array(sub_words), nd.array(offsets), nd.array(
+                    token_types), nd.array(valid_lengths)
                 yield word_inputs, tag_inputs, arc_targets, rel_targets, sub_words, offsets, token_types, valid_lengths
             else:
                 yield word_inputs, tag_inputs, arc_targets, rel_targets

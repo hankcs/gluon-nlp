@@ -238,10 +238,13 @@ class BiaffineParser(nn.Block):
             indices = offsets.reshape([offsets.shape[0], -1])
             one_hot = nd.one_hot(indices, bert_embed.shape[1])
             char_embed = nd.batch_dot(one_hot, bert_embed)
-            char_embed = char_embed.reshape([word_ids.shape[0], word_ids.shape[1], -1, char_embed.shape[-1]])
+            char_embed = char_embed.reshape([offsets.shape[0], offsets.shape[1], -1, char_embed.shape[-1]])
             char_mask = nd.greater(offsets, 0)
             char_embed = char_embed * char_mask.expand_dims(axis=3)
-            bert_embed
+            char_embed = char_embed.sum(axis=2)
+            char_embed = char_embed / char_mask.sum(axis=2).expand_dims(axis=2)
+            char_embed = char_embed.transpose([1, 0, 2])
+            emb_inputs = nd.concat(emb_inputs, char_embed, dim=2)
 
         top_recur = utils.biLSTM(self.f_lstm, self.b_lstm, emb_inputs,
                                  dropout_x=self.dropout_lstm_input)

@@ -90,6 +90,7 @@ class BiaffineParser(nn.Block):
 
         self._vocab = vocab
         self.bert = bert
+        self.bert.collect_params().setattr('grad_req', 'null')
         self.word_embs = embedding_from_numpy(vocab.get_word_embs(word_dims))
         self.pret_word_embs = embedding_from_numpy(vocab.get_pret_embs(),
                                                    trainable=False) if vocab.has_pret_embs() \

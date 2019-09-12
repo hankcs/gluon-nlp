@@ -235,6 +235,12 @@ class BiaffineParser(nn.Block):
         emb_inputs = nd.concat(word_embs, tag_embs, dim=2)  # seq_len x batch_size
         if self.bert is not None:
             bert_embed: nd.NDArray = self.bert(sub_words, token_types, valid_lengths)
+            indices = offsets.reshape([offsets.shape[0], -1])
+            one_hot = nd.one_hot(indices, bert_embed.shape[1])
+            char_embed = nd.batch_dot(one_hot, bert_embed)
+            char_embed = char_embed.reshape([word_ids.shape[0], word_ids.shape[1], -1, char_embed.shape[-1]])
+            char_mask = nd.greater(offsets, 0)
+            char_embed = char_embed * char_mask.expand_dims(axis=3)
             bert_embed
 
         top_recur = utils.biLSTM(self.f_lstm, self.b_lstm, emb_inputs,

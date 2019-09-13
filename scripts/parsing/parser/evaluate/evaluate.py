@@ -58,9 +58,10 @@ def evaluate_official_script(parser, vocab, num_buckets_test, test_batch_size,
     idx = 0
     seconds = time.time()
     uc, lc, total = 0, 0, 0
-    for words, tags, arcs, rels in data_loader.get_batches(batch_size=test_batch_size,
-                                                           shuffle=False):
-        outputs = parser.forward(words, tags)
+    for words, tags, arcs, rels, sub_words, offsets, token_types, valid_lengths in data_loader.get_batches(
+            batch_size=test_batch_size, shuffle=False):
+        outputs = parser.forward(words, tags, sub_words=sub_words, offsets=offsets, token_types=token_types,
+                                 valid_lengths=valid_lengths)
         for output, gold_arc, gold_rel in zip(
                 outputs, arcs.transpose([1, 0]), rels.transpose([1, 0])):
             pred_arc = output[0]

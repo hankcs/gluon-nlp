@@ -582,7 +582,7 @@ class DataLoader:
                     token_types), nd.array(valid_lengths)
                 yield word_inputs, tag_inputs, arc_targets, rel_targets, sub_words, offsets, token_types, valid_lengths
             else:
-                yield word_inputs, tag_inputs, arc_targets, rel_targets
+                yield word_inputs, tag_inputs, arc_targets, rel_targets, None, None, None, None
 
 
 def main():

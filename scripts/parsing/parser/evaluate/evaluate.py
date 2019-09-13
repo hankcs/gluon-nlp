@@ -27,7 +27,7 @@ from scripts.parsing.common.data import DataLoader
 
 
 def evaluate_official_script(parser, vocab, num_buckets_test, test_batch_size,
-                             test_file, output_file, debug=False):
+                             test_file, output_file, bert_vocab=None, debug=False):
     """Evaluate parser on a data set
 
     Parameters
@@ -52,7 +52,7 @@ def evaluate_official_script(parser, vocab, num_buckets_test, test_batch_size,
     tuple
         UAS, LAS, speed
     """
-    data_loader = DataLoader(test_file, num_buckets_test, vocab)
+    data_loader = DataLoader(test_file, num_buckets_test, vocab, bert_vocab=bert_vocab)
     record = data_loader.idx_sequence
     results = [None] * len(record)
     idx = 0
@@ -60,8 +60,11 @@ def evaluate_official_script(parser, vocab, num_buckets_test, test_batch_size,
     uc, lc, total = 0, 0, 0
     for words, tags, arcs, rels, sub_words, offsets, token_types, valid_lengths in data_loader.get_batches(
             batch_size=test_batch_size, shuffle=False):
-        outputs = parser.forward(words, tags, sub_words=sub_words, offsets=offsets, token_types=token_types,
-                                 valid_lengths=valid_lengths)
+        if bert_vocab is not None:
+            outputs = parser.forward(words, tags, sub_words=sub_words, offsets=offsets, token_types=token_types,
+                                     valid_lengths=valid_lengths)
+        else:
+            outputs = parser.forward(words, tags)
         for output, gold_arc, gold_rel in zip(
                 outputs, arcs.transpose([1, 0]), rels.transpose([1, 0])):
             pred_arc = output[0]

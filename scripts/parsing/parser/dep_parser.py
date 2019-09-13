@@ -43,6 +43,7 @@ class DepParser:
         super().__init__()
         self._parser = None
         self._vocab = None
+        self._bert_vocab = None
 
     def train(self, train_file, dev_file, test_file, save_dir,
               pretrained_embeddings=None, bert=None, min_occur_count=2,
@@ -148,6 +149,7 @@ class DepParser:
                 bert, bert_vocab = load_bert('data/bert/bert_base_original', ctx=ctx)
             else:
                 bert_vocab = None
+            self._bert_vocab = bert_vocab
             self._parser = parser = BiaffineParser(vocab, word_dims, tag_dims, bert,
                                                    dropout_emb,
                                                    lstm_layers,
@@ -194,7 +196,8 @@ class DepParser:
                                                                    test_batch_size,
                                                                    dev_file,
                                                                    os.path.join(save_dir,
-                                                                                'valid_tmp'))
+                                                                                'valid_tmp'),
+                                                                   bert_vocab=bert_vocab)
                         logger.info('Dev: UAS %.2f%% LAS %.2f%% %d sents/s', UAS, LAS, speed)
                         epoch += 1
                         if global_step < train_iters:
@@ -223,11 +226,18 @@ class DepParser:
         DepParser
             parser itself
         """
-        config = _Config.load(os.path.join(path, 'config.pkl'))
+        config: _Config = _Config.load(os.path.join(path, 'config.pkl'))
         config.save_dir = path  # redirect root path to what user specified
+        bert = config.bert
+        ctx = mxnet_prefer_gpu()
+        if bert:
+            bert, bert_vocab = load_bert('data/bert/bert_base_original', ctx=ctx)
+        else:
+            bert_vocab = None
+        self._bert_vocab = bert_vocab
         self._vocab = vocab = ParserVocabulary.load(config.save_vocab_path)
-        with mx.Context(mxnet_prefer_gpu()):
-            self._parser = BiaffineParser(vocab, config.word_dims, config.tag_dims,
+        with mx.Context(ctx):
+            self._parser = BiaffineParser(vocab, config.word_dims, config.tag_dims, bert,
                                           config.dropout_emb,
                                           config.lstm_layers,
                                           config.lstm_hiddens, config.dropout_lstm_input,
@@ -264,7 +274,8 @@ class DepParser:
         with mx.Context(mxnet_prefer_gpu()):
             UAS, LAS, speed = evaluate_official_script(parser, vocab, num_buckets_test,
                                                        test_batch_size, test_file,
-                                                       os.path.join(save_dir, 'valid_tmp'))
+                                                       os.path.join(save_dir, 'valid_tmp'),
+                                                       bert_vocab=self._bert_vocab)
         if logger is None:
             logger = init_logger(save_dir, 'test.log')
         logger.info('Test: UAS %.2f%% LAS %.2f%% %d sents/s', UAS, LAS, speed)
@@ -305,20 +316,20 @@ class DepParser:
 if __name__ == '__main__':
     save_dir = 'data/model/biaffine'
     dep_parser = DepParser()
-    # dep_parser.train(train_file='data/ptb/train-debug.conllx',
-    #                  dev_file='data//ptb/dev-debug.conllx',
-    #                  test_file='data//ptb/test-debug.conllx',
-    #                  bert='data/bert/bert_base_original',
-    #                  num_buckets_train=2,
-    #                  num_buckets_valid=2,
-    #                  save_dir=save_dir,
-    #                  pretrained_embeddings=None, debug=True)
-    dep_parser.train(train_file='data/ptb/train.conllx',
-                     dev_file='data//ptb/dev.conllx',
-                     test_file='data//ptb/test.conllx',
+    dep_parser.train(train_file='data/ptb/train-debug.conllx',
+                     dev_file='data//ptb/dev-debug.conllx',
+                     test_file='data//ptb/test-debug.conllx',
                      bert='data/bert/bert_base_original',
+                     num_buckets_train=2,
+                     num_buckets_valid=2,
                      save_dir=save_dir,
-                     pretrained_embeddings=('glove', 'glove.6B.100d'))
+                     pretrained_embeddings=None, debug=True)
+    # dep_parser.train(train_file='data/ptb/train.conllx',
+    #                  dev_file='data//ptb/dev.conllx',
+    #                  test_file='data//ptb/test.conllx',
+    #                  bert='data/bert/bert_base_original',
+    #                  save_dir=save_dir,
+    #                  pretrained_embeddings=('glove', 'glove.6B.100d'))
     dep_parser.load(save_dir)
     dep_parser.evaluate(test_file='data/biaffine/ptb/test.conllx',
                         save_dir=save_dir)

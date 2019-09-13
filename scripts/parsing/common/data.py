@@ -23,8 +23,8 @@ import numpy as np
 from gluonnlp.vocab import BERTVocab
 
 import gluonnlp
-from common.savable import Savable
 from gluonnlp.model.utils import _load_vocab
+from scripts.parsing.common.savable import Savable
 from scripts.parsing.common.k_means import KMeans
 import itertools
 import mxnet.ndarray as nd

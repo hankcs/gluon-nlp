@@ -30,9 +30,9 @@ from mxnet import nd
 from mxnet.gluon import rnn, contrib
 
 import gluonnlp
-from common.data import ParserVocabulary
-from common.tarjan import Tarjan
 from gluonnlp.model.bert import get_bert_model
+from scripts.parsing.common.data import ParserVocabulary
+from scripts.parsing.common.tarjan import Tarjan
 
 
 class Progbar:

@@ -595,7 +595,11 @@ def main():
 
     for word_inputs, tag_inputs, arc_targets, rel_targets, sub_word_seq, sub_word_offset, token_types, valid_lengths in data_loader.get_batches(
             5):
-        print()
+        print(' '.join(vocab.id2word(word_id) for word_id in word_inputs[:, 0]))
+        print(' '.join(bert_vocab.idx_to_token[sub_id] for sub_id in sub_word_seq[0]))
+        for offsets in sub_word_seq:
+            print()
+        break
 
 
 if __name__ == '__main__':

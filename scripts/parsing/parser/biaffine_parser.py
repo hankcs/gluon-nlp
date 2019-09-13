@@ -90,7 +90,7 @@ class BiaffineParser(nn.Block):
 
         self._vocab = vocab
         self.bert = bert
-        self.bert.collect_params().setattr('grad_req', 'null')
+        # self.bert.collect_params().setattr('grad_req', 'null')
         self.word_embs = embedding_from_numpy(vocab.get_word_embs(word_dims))
         self.pret_word_embs = embedding_from_numpy(vocab.get_pret_embs(),
                                                    trainable=False) if vocab.has_pret_embs() \
@@ -238,14 +238,18 @@ class BiaffineParser(nn.Block):
             bert_embed: nd.NDArray = self.bert(sub_words, token_types, valid_lengths)
             indices = offsets.reshape([offsets.shape[0], -1])
             one_hot = nd.one_hot(indices, bert_embed.shape[1])
-            char_embed = nd.batch_dot(one_hot, bert_embed)
-            char_embed = char_embed.reshape([offsets.shape[0], offsets.shape[1], -1, char_embed.shape[-1]])
-            char_mask = nd.greater(offsets, 0)
-            char_embed = char_embed * char_mask.expand_dims(axis=3)
-            char_embed = char_embed.sum(axis=2)
-            char_embed = char_embed / char_mask.sum(axis=2).expand_dims(axis=2)
-            char_embed = char_embed.transpose([1, 0, 2])
-            emb_inputs = nd.concat(emb_inputs, char_embed, dim=2)
+            subword_embed = nd.batch_dot(one_hot, bert_embed)
+            subword_embed = subword_embed.reshape([offsets.shape[0], offsets.shape[1], -1, subword_embed.shape[-1]])
+            subword_mask = nd.greater(offsets, 0)
+            subword_embed = subword_embed * subword_mask.expand_dims(axis=3)
+            subword_embed = subword_embed.sum(axis=2)
+            num_of_subtokens = subword_mask.sum(axis=2)
+            num_of_subtokens += 1e-20  # avoid NaN
+            num_of_subtokens = num_of_subtokens.expand_dims(axis=2)
+
+            subword_embed = subword_embed / num_of_subtokens
+            subword_embed = subword_embed.transpose([1, 0, 2])
+            emb_inputs = nd.concat(emb_inputs, subword_embed, dim=2)
 
         top_recur = utils.biLSTM(self.f_lstm, self.b_lstm, emb_inputs,
                                  dropout_x=self.dropout_lstm_input)

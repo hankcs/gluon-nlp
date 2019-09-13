@@ -146,6 +146,8 @@ class DepParser:
         with mx.Context(ctx):
             if bert:
                 bert, bert_vocab = load_bert('data/bert/bert_base_original', ctx=ctx)
+            else:
+                bert_vocab = None
             self._parser = parser = BiaffineParser(vocab, word_dims, tag_dims, bert,
                                                    dropout_emb,
                                                    lstm_layers,
@@ -303,20 +305,20 @@ class DepParser:
 if __name__ == '__main__':
     save_dir = 'data/model/biaffine'
     dep_parser = DepParser()
-    # dep_parser.train(train_file='data/ptb/train-debug.conllx',
-    #                  dev_file='data//ptb/dev-debug.conllx',
-    #                  test_file='data//ptb/test-debug.conllx',
-    #                  bert='data/bert/bert_base_original',
-    #                  num_buckets_train=2,
-    #                  num_buckets_valid=2,
-    #                  save_dir=save_dir,
-    #                  pretrained_embeddings=None, debug=True)
-    dep_parser.train(train_file='data/ptb/train.conllx',
-                     dev_file='data//ptb/dev.conllx',
-                     test_file='data//ptb/test.conllx',
+    dep_parser.train(train_file='data/ptb/train-debug.conllx',
+                     dev_file='data//ptb/dev-debug.conllx',
+                     test_file='data//ptb/test-debug.conllx',
                      bert='data/bert/bert_base_original',
+                     num_buckets_train=2,
+                     num_buckets_valid=2,
                      save_dir=save_dir,
-                     pretrained_embeddings=('glove', 'glove.6B.100d'))
+                     pretrained_embeddings=None, debug=True)
+    # dep_parser.train(train_file='data/ptb/train.conllx',
+    #                  dev_file='data//ptb/dev.conllx',
+    #                  test_file='data//ptb/test.conllx',
+    #                  bert='data/bert/bert_base_original',
+    #                  save_dir=save_dir,
+    #                  pretrained_embeddings=('glove', 'glove.6B.100d'))
     dep_parser.load(save_dir)
     dep_parser.evaluate(test_file='data/biaffine/ptb/test.conllx',
                         save_dir=save_dir)

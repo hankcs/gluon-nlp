@@ -147,7 +147,7 @@ class DepParser:
         ctx = mxnet_prefer_gpu()
         with mx.Context(ctx):
             if bert:
-                bert, bert_vocab = load_bert('data/bert/bert_base_original', ctx=ctx)
+                bert, bert_vocab = load_bert(bert, ctx=ctx)
             else:
                 bert_vocab = None
             self._bert_vocab = bert_vocab
@@ -266,7 +266,7 @@ class DepParser:
         bert = config.bert
         ctx = mxnet_prefer_gpu()
         if bert:
-            bert, bert_vocab = load_bert('data/bert/bert_base_original', ctx=ctx)
+            bert, bert_vocab = load_bert(bert, ctx=ctx)
         else:
             bert_vocab = None
         self._bert_vocab = bert_vocab

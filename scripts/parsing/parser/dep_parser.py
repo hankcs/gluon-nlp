@@ -24,6 +24,7 @@ import numpy as np
 
 import mxnet as mx
 from mxnet import gluon, autograd
+from mxnet.contrib import amp
 
 from scripts.parsing.common.config import _Config
 from scripts.parsing.common.data import ParserVocabulary, DataLoader, ConllWord, ConllSentence
@@ -54,7 +55,7 @@ class DepParser:
               beta_1=.9, beta_2=.9, epsilon=1e-12,
               num_buckets_train=40,
               num_buckets_valid=10, num_buckets_test=10, train_iters=50000, train_batch_size=5000,
-              test_batch_size=5000, validate_every=100, save_after=5000, debug=False):
+              test_batch_size=5000, validate_every=100, save_after=5000, dtype=None, accumulate=None, debug=False):
         """Train a deep biaffine dependency parser.
 
         Parameters
@@ -162,8 +163,29 @@ class DepParser:
             optimizer = mx.optimizer.Adam(learning_rate, beta_1, beta_2, epsilon,
                                           lr_scheduler=scheduler)
             trainer = gluon.Trainer(parser.collect_params(), optimizer=optimizer)
+            if dtype == 'float16':
+                try:
+                    amp.lists.symbol.FP32_FUNCS.append('topk')
+                    amp.lists.symbol.FP16_FP32_FUNCS.remove('topk')
+                except ValueError:
+                    pass
+                amp.init()
+                amp.init_trainer(trainer)
+            step_size = train_batch_size * accumulate if accumulate else train_batch_size
+            # Do not apply weight decay on LayerNorm and bias terms
+            model = parser
+            all_model_params = model.collect_params()
+            for _, v in model.collect_params('.*beta|.*gamma|.*bias').items():
+                v.wd_mult = 0.0
+            # Collect differentiable parameters
+            params = [p for p in all_model_params.values() if p.grad_req != 'null']
+            # Set grad_req if gradient accumulation is required
+            if accumulate and accumulate > 1:
+                for p in params:
+                    p.grad_req = 'add'
             data_loader = DataLoader(train_file, num_buckets_train, vocab, bert_vocab=bert_vocab)
             global_step = 0
+            step_num = 0
             best_UAS = 0.
             batch_id = 0
             epoch = 1
@@ -171,14 +193,27 @@ class DepParser:
             logger.info('Epoch %d out of %d', epoch, total_epoch)
             bar = Progbar(target=min(validate_every, data_loader.samples))
             while global_step < train_iters:
-                for batch in data_loader.get_batches(batch_size=train_batch_size,
+                all_model_params.zero_grad()
+                for batch in data_loader.get_batches(batch_size=step_size,
                                                      shuffle=True):
 
                     with autograd.record():
                         arc_accuracy, _, _, loss = parser.forward(*batch)
-                        loss_value = loss.asscalar()
-                    loss.backward()
-                    trainer.step(train_batch_size)
+                    loss_value = loss.asscalar()
+                    if dtype == 'float16':
+                        with amp.scale_loss(loss, trainer) as scaled_loss:
+                            mx.autograd.backward(scaled_loss)
+                    else:
+                        loss.backward()
+                        # update
+                    if not accumulate or (batch_id + 1) % accumulate == 0:
+                        trainer.allreduce_grads()
+                        # nlp.utils.clip_grad_global_norm(params, 1)
+                        trainer.update(accumulate if accumulate else 1)
+                        step_num += 1
+                        if accumulate and accumulate > 1:
+                            # set grad to zero for gradient accumulation
+                            all_model_params.zero_grad()
                     batch_id += 1
                     try:
                         bar.update(batch_id,
@@ -316,12 +351,17 @@ class DepParser:
 if __name__ == '__main__':
     save_dir = 'data/model/biaffine'
     dep_parser = DepParser()
+    accumulate = 2
+    train_batch_size = 4 // accumulate
     dep_parser.train(train_file='data/ptb/train-debug.conllx',
                      dev_file='data//ptb/dev-debug.conllx',
                      test_file='data//ptb/test-debug.conllx',
                      bert='data/bert/bert_base_original',
                      num_buckets_train=2,
                      num_buckets_valid=2,
+                     # dtype='float16',
+                     train_batch_size=train_batch_size,
+                     accumulate=accumulate,
                      save_dir=save_dir,
                      pretrained_embeddings=None, debug=True)
     # dep_parser.train(train_file='data/ptb/train.conllx',
@@ -329,6 +369,9 @@ if __name__ == '__main__':
     #                  test_file='data//ptb/test.conllx',
     #                  bert='data/bert/bert_base_original',
     #                  save_dir=save_dir,
+    #                  # train_batch_size=train_batch_size,
+    #                  # accumulate=accumulate,
+    #                  dtype='float16',
     #                  pretrained_embeddings=('glove', 'glove.6B.100d'))
     dep_parser.load(save_dir)
     dep_parser.evaluate(test_file='data/biaffine/ptb/test.conllx',

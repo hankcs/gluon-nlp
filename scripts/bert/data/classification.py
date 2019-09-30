@@ -251,16 +251,18 @@ class SSTTask(GlueTask):
         """
         return GlueSST2(segment=segment, root=root)
 
-class RadiologyTask(GlueTask):
+class EDTask(GlueTask):
 
     def __init__(self):
         is_pair = False
-        class_labels = ['71010', '71020', '71035', '71022', '71030', '71021']
+        class_labels = {'caring', 'devastated', 'trusting', 'annoyed', 'hopeful', 'apprehensive', 'anticipating', 'sentimental', 'afraid', 'jealous', 'anxious', 'nostalgic', 'guilty', 'prepared', 'disgusted', 'surprised', 'grateful', 'furious', 'sad', 'content', 'angry', 'excited', 'disappointed', 'embarrassed', 'proud', 'confident', 'impressed', 'lonely', 'faithful', 'ashamed', 'terrified', 'joyful'}
         metric = Accuracy()
-        super(RadiologyTask, self).__init__(class_labels, metric, is_pair)
+        super(EDTask, self).__init__(class_labels, metric, is_pair)
 
     def get_dataset(self, segment='train', root='data'):
-        return TSVDataset(filename=os.path.join(root, '{}.tsv'.format(segment)))
+        if segment == 'dev':
+            segment = 'valid'
+        return TSVDataset(filename=os.path.join(root, '{}.bert.csv'.format(segment)))
 
 class WNLITask(GlueTask):
     """The Winograd NLI task on GlueBenchmark."""

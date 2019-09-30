@@ -50,7 +50,7 @@ from gluonnlp.model import get_model
 from gluonnlp.data import BERTTokenizer
 
 from model.classification import BERTClassifier, BERTRegression
-from data.classification import MRPCTask, QQPTask, RTETask, STSBTask, SSTTask, RadiologyTask
+from data.classification import MRPCTask, QQPTask, RTETask, STSBTask, SSTTask, EDTask
 from data.classification import QNLITask, CoLATask, MNLITask, WNLITask, XNLITask
 from data.transform import BERTDatasetTransform
 
@@ -65,7 +65,7 @@ tasks = {
     'WNLI': WNLITask(),
     'SST': SSTTask(),
     'XNLI': XNLITask(),
-    'RAD': RadiologyTask()
+    'EDQA': EDTask()
 }
 
 parser = argparse.ArgumentParser(
